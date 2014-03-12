@@ -229,7 +229,8 @@
 - (void)configureCell:(UITableViewCell *)cell atIndexPath:(NSIndexPath *)indexPath
 {
     NSManagedObject *object = [self.fetchedResultsController objectAtIndexPath:indexPath];
-    cell.textLabel.text = [[object valueForKey:@"timeStamp"] description];
+    NSDate *timestamp = [object valueForKey:@"timeStamp"];
+    cell.textLabel.text = [NSString stringWithFormat:@"%f", [timestamp timeIntervalSinceReferenceDate]];
 }
 
 @end

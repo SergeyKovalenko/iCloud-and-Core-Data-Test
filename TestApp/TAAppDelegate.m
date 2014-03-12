@@ -18,6 +18,37 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    
+    id currentiCloudToken = [[NSFileManager defaultManager] ubiquityIdentityToken];
+    NSLog(@"ubiquityIdentityToken %@", [[NSString alloc] initWithData:currentiCloudToken
+                                                             encoding:NSUTF8StringEncoding]);
+
+    if (currentiCloudToken) {
+        NSData *newTokenData =
+        [NSKeyedArchiver archivedDataWithRootObject: currentiCloudToken];
+        [[NSUserDefaults standardUserDefaults]
+         setObject: newTokenData
+         forKey: @"com.apple.TestApp.UbiquityIdentityToken"];
+        __block NSURL *myUbiquityContainer;
+        dispatch_async (dispatch_get_global_queue (DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void) {
+            myUbiquityContainer = [[NSFileManager defaultManager]
+                                   URLForUbiquityContainerIdentifier: nil];
+            if (myUbiquityContainer != nil) {
+                // Your app can write to the ubiquity container
+                NSLog(@"myUbiquityContainer %@",myUbiquityContainer);
+                
+                dispatch_async (dispatch_get_main_queue (), ^(void) {
+                    // On the main thread, update UI and state as appropriate
+                });
+            }
+        });
+        [self registerForiCloudNotifications];
+    } else {
+        [[NSUserDefaults standardUserDefaults]
+         removeObjectForKey: @"com.apple.TestApp.UbiquityIdentityToken"];
+    }
+    
+    
     // Override point for customization after application launch.
     if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
         UISplitViewController *splitViewController = (UISplitViewController *)self.window.rootViewController;
@@ -50,6 +81,8 @@
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
     // Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
+    [self saveContext];
+
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
@@ -61,6 +94,61 @@
 {
     // Saves changes in the application's managed object context before the application terminates.
     [self saveContext];
+}
+
+#pragma mark - Notification Observers
+- (void)registerForiCloudNotifications {
+    NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
+	
+    [notificationCenter addObserver:self
+                           selector:@selector(storesWillChange:)
+                               name:NSPersistentStoreCoordinatorStoresWillChangeNotification
+                             object:self.persistentStoreCoordinator];
+    
+    [notificationCenter addObserver:self
+                           selector:@selector(storesDidChange:)
+                               name:NSPersistentStoreCoordinatorStoresDidChangeNotification
+                             object:self.persistentStoreCoordinator];
+    
+    [notificationCenter addObserver:self
+                           selector:@selector(persistentStoreDidImportUbiquitousContentChanges:)
+                               name:NSPersistentStoreDidImportUbiquitousContentChangesNotification
+                             object:self.persistentStoreCoordinator];
+}
+
+# pragma mark - iCloud Support
+
+- (void) persistentStoreDidImportUbiquitousContentChanges:(NSNotification *)notification {
+    NSManagedObjectContext *context = self.managedObjectContext;
+	NSLog(@"persistentStoreDidImportUbiquitousContentChanges : %@", notification);
+    [context performBlock:^{
+        [context mergeChangesFromContextDidSaveNotification:notification];
+    }];
+}
+
+- (void)storesWillChange:(NSNotification *)notification {
+    NSManagedObjectContext *context = self.managedObjectContext;
+	
+    [context performBlockAndWait:^{
+        NSError *error;
+		
+        if ([context hasChanges]) {
+            BOOL success = [context save:&error];
+            
+            if (!success && error) {
+                // perform error handling
+                NSLog(@"%@",[error localizedDescription]);
+            }
+        }
+        
+        [context reset];
+    }];
+    
+    // Refresh your User Interface.
+}
+
+- (void)storesDidChange:(NSNotification *)notification {
+    // Refresh your User Interface.
 }
 
 - (void)saveContext
@@ -89,8 +177,9 @@
     
     NSPersistentStoreCoordinator *coordinator = [self persistentStoreCoordinator];
     if (coordinator != nil) {
-        _managedObjectContext = [[NSManagedObjectContext alloc] init];
+        _managedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
         [_managedObjectContext setPersistentStoreCoordinator:coordinator];
+        [_managedObjectContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     return _managedObjectContext;
 }
@@ -119,7 +208,12 @@
     
     NSError *error = nil;
     _persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:[self managedObjectModel]];
-    if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:nil error:&error]) {
+    if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                   configuration:nil
+                                                             URL:storeURL
+                                                         options:@{ NSPersistentStoreUbiquitousContentNameKey : @"TestApp",
+                                                                    NSPersistentStoreUbiquitousContentURLKey  :  @"TestAppCDLogs"}
+                                                           error:&error]) {
         /*
          Replace this implementation with code to handle the error appropriately.
          
