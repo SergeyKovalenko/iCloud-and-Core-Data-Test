@@ -7,8 +7,9 @@
 //
 
 #import "TAMasterViewController.h"
-
+#import "TACoreDataStack.h"
 #import "TADetailViewController.h"
+#import "TAAppDelegate.h"
 
 @interface TAMasterViewController ()
 - (void)configureCell:(UITableViewCell *)cell atIndexPath:(NSIndexPath *)indexPath;
@@ -28,19 +29,24 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+    self.managedObjectContext = [[[TAAppDelegate appdelegate] coreDataStack] mainContext];
+
 	// Do any additional setup after loading the view, typically from a nib.
-    self.navigationItem.leftBarButtonItem = self.editButtonItem;
+     UIBarButtonItem *trashButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemTrash
+                                                                                  target:self
+                                                                                  action:@selector(removeAllObjects:)];
+    self.navigationItem.leftBarButtonItem = trashButton;
 
-    UIBarButtonItem *addButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(insertNewObject:)];
+    UIBarButtonItem *addButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd
+                                                                               target:self
+                                                                               action:@selector(insertNewObject:)];
     self.navigationItem.rightBarButtonItem = addButton;
+    
     self.detailViewController = (TADetailViewController *)[[self.splitViewController.viewControllers lastObject] topViewController];
+    
 }
 
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
-}
+
 
 - (void)insertNewObject:(id)sender
 {
@@ -61,6 +67,25 @@
         abort();
     }
 }
+- (void)removeAllObjects:(id)sender
+{
+    NSManagedObjectContext *context = [self.fetchedResultsController managedObjectContext];
+
+    for (NSManagedObject *object in [[self.fetchedResultsController fetchedObjects] copy]) {
+        [context deleteObject:object];
+    }
+    
+    // Save the context.
+    NSError *error = nil;
+    if (![context save:&error]) {
+        // Replace this implementation with code to handle the error appropriately.
+        // abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
+        NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
+        abort();
+    }
+    
+}
+
 
 #pragma mark - Table View
 
