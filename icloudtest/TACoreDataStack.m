@@ -23,6 +23,32 @@
 
 #pragma mark - CoreData Stack
 
++ (NSPointerArray*)stack {
+    static dispatch_once_t onceToken;
+    static NSPointerArray *stack;
+    dispatch_once(&onceToken, ^{
+        stack = [NSPointerArray weakObjectsPointerArray];
+    });
+    return stack;
+}
+
++ (instancetype)currentStack {
+    __block TACoreDataStack *currentStack = nil;
+    [[[self stack] allObjects] enumerateObjectsWithOptions:NSEnumerationReverse
+                                                usingBlock:^(TACoreDataStack *stack, NSUInteger idx, BOOL *stop) {
+                                                    if (stack != NULL) {
+                                                        currentStack = stack;
+                                                        *stop = YES;
+                                                    } else {
+                                                        [[self stack] removePointerAtIndex:idx];
+                                                    }
+                                                }];
+    return currentStack;
+}
+- (void)dealloc {
+    NSPointerArray *stack = [TACoreDataStack stack];
+    [stack removePointerAtIndex:stack.count - 1];
+}
 - (id)init {
     return [self initWithPersistentStoreURL:nil];
 }
@@ -30,11 +56,7 @@
 - (instancetype)initWithPersistentStoreURL:(NSURL *)URL {
     self = [super init];
     if (self) {
-        
         _persistentStoreURL = URL ?: [self storeURL];
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        
-//        self.isiCloudEnable = [defaults boolForKey:@""]
         
         BOOL(^ubiquityIdentity)() = ^(){
             
@@ -77,6 +99,8 @@
         }
     }
     
+    NSPointerArray *stack = [TACoreDataStack stack];
+    [stack addPointer:(__bridge void *)(self)];
     return self;
 }
 
@@ -185,9 +209,9 @@
         [self saveContext];
         
         NSError *internalError = error ? *error : nil;
-        
+        NSURL *storeURL = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"ICDataBase.sqlite"];
         NSPersistentStore *newstore = [self.persistentStoreCoordinator migratePersistentStore:store
-                                                                                        toURL:[self storeURL]
+                                                                                        toURL:storeURL
                                                                                       options:[self storeOptions]
                                                                                      withType:NSSQLiteStoreType
                                                                                         error:&internalError];
@@ -196,10 +220,6 @@
         
        migrated = newstore && [[NSFileManager defaultManager] removeItemAtURL:store.URL
                                                                         error:&internalError];
-
-        migrated = [self reloadStore:newstore
-                         withOptions:[self storeOptions]
-                               error:&internalError];
 
         NSLog(@"%@ %@", NSStringFromSelector(_cmd), internalError);
 
@@ -220,8 +240,7 @@
         
         [self saveContext];
         
-        NSMutableDictionary *localStoreOptions = [[self storeOptions] mutableCopy];
-        [localStoreOptions setObject:@YES forKey:NSPersistentStoreRemoveUbiquitousMetadataOption];
+        NSDictionary *localStoreOptions = @{NSPersistentStoreRemoveUbiquitousMetadataOption : @YES};
         
         NSError *internalError = error ? *error : nil;
         
@@ -235,10 +254,7 @@
         migrated = newstore && [[NSFileManager defaultManager] removeItemAtURL:store.URL
                                                                          error:&internalError];
         NSLog(@"%@ %@", NSStringFromSelector(_cmd), internalError);
-        
-        migrated = [self reloadStore:newstore
-                         withOptions:nil
-                               error:&internalError];
+
         
     } else if(error){
         *error = [NSError errorWithDomain:NSStringFromClass([self class])
@@ -249,19 +265,36 @@
     return migrated;
 }
 
-- (BOOL)reloadStore:(NSPersistentStore *)store withOptions:(NSDictionary *)options error:(NSError **)error {
-    BOOL reloaded = NO;
++ (BOOL)removeiCliudDataWithError:(NSError **)error {
+    BOOL isOK = NO;
     
-    if (store && [self.persistentStoreCoordinator removePersistentStore:store error:error]) {
-        NSPersistentStore *newstore = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                                                                    configuration:nil
-                                                                                              URL:[self storeURL]
-                                                                                          options:options
-                                                                                            error:error];
-        reloaded = newstore != NO;
+    NSError *internalError = error ? *error : nil;
+
+    for (TACoreDataStack *stack in [[self stack] allObjects]) {
+        NSPersistentStore *store = [[stack.persistentStoreCoordinator persistentStores] firstObject];
+        NSURL *storeURL = store.URL;
+        NSDictionary *options = store.options;
+        [stack migratePersistentStoreToLocalStoreWithError:nil];
+        NSError *error = nil;
+        @try {
+            isOK = [NSPersistentStoreCoordinator removeUbiquitousContentAndPersistentStoreAtURL:storeURL
+                                                                                        options:options
+                                                                                          error:&error];
+        }
+        @catch (NSException *exception) {
+            NSLog(@"%@ %@", NSStringFromSelector(_cmd), exception);
+
+            break;
+        }
+  
+        NSLog(@"%@ %@", NSStringFromSelector(_cmd), error);
+        if (!isOK) {
+            break;
+        }
     }
-    return reloaded;
+    return isOK;
 }
+
 
 #pragma mark - Notification Observers
 
@@ -297,7 +330,7 @@
 }
 
 - (void)persistentStoreDidImportUbiquitousContentChanges:(NSNotification *)notification {
-    NSManagedObjectContext *context = self.backgroundContext;
+    NSManagedObjectContext *context = self.mainContext;
 	NSLog(@"persistentStoreDidImportUbiquitousContentChanges : %@", notification);
     
     [context performBlock:^{

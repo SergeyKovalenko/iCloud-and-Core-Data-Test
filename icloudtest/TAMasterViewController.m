@@ -9,7 +9,6 @@
 #import "TAMasterViewController.h"
 #import "TACoreDataStack.h"
 #import "TADetailViewController.h"
-#import "TAAppDelegate.h"
 
 @interface TAMasterViewController ()
 - (void)configureCell:(UITableViewCell *)cell atIndexPath:(NSIndexPath *)indexPath;
@@ -29,7 +28,6 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    self.managedObjectContext = [[[TAAppDelegate appdelegate] coreDataStack] mainContext];
 
 	// Do any additional setup after loading the view, typically from a nib.
      UIBarButtonItem *trashButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemTrash
@@ -59,13 +57,7 @@
     [newManagedObject setValue:[NSDate date] forKey:@"timeStamp"];
     
     // Save the context.
-    NSError *error = nil;
-    if (![context save:&error]) {
-         // Replace this implementation with code to handle the error appropriately.
-         // abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development. 
-        NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
-        abort();
-    }
+    [[TACoreDataStack currentStack] saveContext];
 }
 - (void)removeAllObjects:(id)sender
 {
@@ -76,13 +68,7 @@
     }
     
     // Save the context.
-    NSError *error = nil;
-    if (![context save:&error]) {
-        // Replace this implementation with code to handle the error appropriately.
-        // abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-        NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
-        abort();
-    }
+    [[TACoreDataStack currentStack] saveContext];
     
 }
 
@@ -162,7 +148,8 @@
     
     NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
     // Edit the entity name as appropriate.
-    NSEntityDescription *entity = [NSEntityDescription entityForName:@"Event" inManagedObjectContext:self.managedObjectContext];
+    NSEntityDescription *entity = [NSEntityDescription entityForName:@"Event"
+                                              inManagedObjectContext:[[TACoreDataStack currentStack] mainContext]];
     [fetchRequest setEntity:entity];
     
     // Set the batch size to a suitable number.
@@ -176,7 +163,7 @@
     
     // Edit the section name key path and cache name if appropriate.
     // nil for section name key path means "no sections".
-    NSFetchedResultsController *aFetchedResultsController = [[NSFetchedResultsController alloc] initWithFetchRequest:fetchRequest managedObjectContext:self.managedObjectContext sectionNameKeyPath:nil cacheName:@"Master"];
+    NSFetchedResultsController *aFetchedResultsController = [[NSFetchedResultsController alloc] initWithFetchRequest:fetchRequest managedObjectContext:[[TACoreDataStack currentStack] mainContext] sectionNameKeyPath:nil cacheName:@"Master"];
     aFetchedResultsController.delegate = self;
     self.fetchedResultsController = aFetchedResultsController;
     

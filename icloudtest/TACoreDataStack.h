@@ -13,6 +13,8 @@
 
 - (instancetype)initWithPersistentStoreURL:(NSURL*)URL;
 
++ (instancetype)currentStack;
+
 @property (readonly, strong, nonatomic) NSURL *persistentStoreURL;
 
 @property (readonly, strong, nonatomic) NSManagedObjectContext *mainContext;
@@ -30,5 +32,7 @@
 - (BOOL)migratePersistentStoreToiCloudStoreWithError:(NSError **)error;
 
 - (BOOL)migratePersistentStoreToLocalStoreWithError:(NSError **)error;
+
++ (BOOL)removeiCliudDataWithError:(NSError **)error;
 
 @end

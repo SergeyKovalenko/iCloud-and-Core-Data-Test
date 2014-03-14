@@ -9,6 +9,7 @@
 #import <UIKit/UIKit.h>
 
 @class TADetailViewController;
+@class TACoreDataStack;
 
 #import <CoreData/CoreData.h>
 
@@ -17,6 +18,5 @@
 @property (strong, nonatomic) TADetailViewController *detailViewController;
 
 @property (strong, nonatomic) NSFetchedResultsController *fetchedResultsController;
-@property (strong, nonatomic) NSManagedObjectContext *managedObjectContext;
 
 @end

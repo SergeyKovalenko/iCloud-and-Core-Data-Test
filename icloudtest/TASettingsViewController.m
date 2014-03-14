@@ -7,7 +7,6 @@
 //
 
 #import "TASettingsViewController.h"
-#import "TAAppDelegate.h"
 #import "TACoreDataStack.h"
 
 @interface TASettingsViewController ()
@@ -20,19 +19,22 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.iCloudSwitch.on = [[[TAAppDelegate appdelegate]coreDataStack] iCloudEnabled];
+    self.iCloudSwitch.on = [[TACoreDataStack currentStack] iCloudEnabled];
 }
 
 - (IBAction)enableiCloud:(id)sender {
     if (self.iCloudSwitch.isOn) {
-        [[[TAAppDelegate appdelegate]coreDataStack] migratePersistentStoreToiCloudStoreWithError:nil];
+        [[TACoreDataStack currentStack] migratePersistentStoreToiCloudStoreWithError:nil];
     } else {
-      [[[TAAppDelegate appdelegate]coreDataStack] migratePersistentStoreToLocalStoreWithError:nil];
+        [[TACoreDataStack currentStack] migratePersistentStoreToLocalStoreWithError:nil];
     }
 }
 
 - (IBAction)removeiCloudData:(id)sender {
-
+    if ([[TACoreDataStack currentStack] iCloudEnabled]) {
+        [TACoreDataStack removeiCliudDataWithError:nil];
+        self.iCloudSwitch.on = [[TACoreDataStack currentStack] iCloudEnabled];
+    }
 }
 
 @end
