@@ -36,7 +36,7 @@
                                                                                   target:self
                                                                                   action:@selector(removeAllObjects:)];
     self.navigationItem.leftBarButtonItem = trashButton;
-
+    self.navigationItem.leftItemsSupplementBackButton = YES;
     UIBarButtonItem *addButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd
                                                                                target:self
                                                                                action:@selector(insertNewObject:)];

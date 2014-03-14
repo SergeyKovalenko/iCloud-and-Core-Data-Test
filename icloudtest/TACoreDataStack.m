@@ -10,6 +10,7 @@
 
 @interface TACoreDataStack ()
 @property (nonatomic, strong) id ubiquityIdentityObserver;
+@property (nonatomic, assign, getter = isiCloudEnable) BOOL iCloudEnable;
 @end
 
 @implementation TACoreDataStack
@@ -29,10 +30,14 @@
 - (instancetype)initWithPersistentStoreURL:(NSURL *)URL {
     self = [super init];
     if (self) {
+        
         _persistentStoreURL = URL ?: [self storeURL];
-
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        
+//        self.isiCloudEnable = [defaults boolForKey:@""]
+        
         BOOL(^ubiquityIdentity)() = ^(){
-
+            
             id currentiCloudToken = [[NSFileManager defaultManager] ubiquityIdentityToken];
             BOOL iCloudEnabled = currentiCloudToken != nil;
             
@@ -60,8 +65,8 @@
             }
             return iCloudEnabled;
         };
-
-
+        
+        
         if (!ubiquityIdentity()) {
             _ubiquityIdentityObserver = [[NSNotificationCenter defaultCenter] addObserverForName:NSUbiquityIdentityDidChangeNotification
                                                                                           object:nil
@@ -79,9 +84,9 @@
     return [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"DataBase.sqlite"];
 }
 
-- (NSURL *)applicationDocumentsDirectory
-{
-    return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+- (NSURL *)applicationDocumentsDirectory {
+    return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                   inDomains:NSUserDomainMask] lastObject];
 }
 
 - (NSManagedObjectContext *)mainContext {
@@ -180,15 +185,24 @@
         [self saveContext];
         
         NSError *internalError = error ? *error : nil;
+        
         NSPersistentStore *newstore = [self.persistentStoreCoordinator migratePersistentStore:store
                                                                                         toURL:[self storeURL]
                                                                                       options:[self storeOptions]
                                                                                      withType:NSSQLiteStoreType
                                                                                         error:&internalError];
+        
         NSLog(@"%@ %@", NSStringFromSelector(_cmd), internalError);
+        
+       migrated = newstore && [[NSFileManager defaultManager] removeItemAtURL:store.URL
+                                                                        error:&internalError];
+
         migrated = [self reloadStore:newstore
                          withOptions:[self storeOptions]
                                error:&internalError];
+
+        NSLog(@"%@ %@", NSStringFromSelector(_cmd), internalError);
+
     } else if(error){
         *error = [NSError errorWithDomain:NSStringFromClass([self class])
                                      code:101
@@ -218,9 +232,14 @@
                                                                                         error:&internalError];
         NSLog(@"%@ %@", NSStringFromSelector(_cmd), internalError);
         
+        migrated = newstore && [[NSFileManager defaultManager] removeItemAtURL:store.URL
+                                                                         error:&internalError];
+        NSLog(@"%@ %@", NSStringFromSelector(_cmd), internalError);
+        
         migrated = [self reloadStore:newstore
                          withOptions:nil
                                error:&internalError];
+        
     } else if(error){
         *error = [NSError errorWithDomain:NSStringFromClass([self class])
                                      code:102
